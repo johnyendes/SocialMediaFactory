@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { WhiteLabelService } from '@/lib/white-label';
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    // Check if user is admin
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const organizationId = searchParams.get('organizationId') || 'default';
+
+    // Get organization branding
+    const branding = await WhiteLabelService.getOrganizationBranding(organizationId);
+
+    if (!branding) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(branding);
+
+  } catch (error) {
+    console.error('Error fetching branding:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    // Check if user is admin
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const brandingConfig = await request.json();
+    const { organizationId } = brandingConfig;
+
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Organization ID is required' }, { status: 400 });
+    }
+
+    // Update organization branding
+    const success = await WhiteLabelService.updateOrganizationBranding(
+      organizationId,
+      brandingConfig
+    );
+
+    if (success) {
+      return NextResponse.json({ message: 'Branding updated successfully' });
+    } else {
+      return NextResponse.json({ error: 'Failed to update branding' }, { status: 400 });
+    }
+
+  } catch (error) {
+    console.error('Error updating branding:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

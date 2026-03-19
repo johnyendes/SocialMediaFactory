@@ -1,0 +1,552 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  name                 String?
+  password             String
+  role                 String                @default("USER")
+  emailVerified        DateTime?
+  image                String?
+  organizationId       String?
+  mfaEnabled           Boolean               @default(false)
+  mfaSecret            String?
+  mfaBackupCodes       String?
+  mfaEnabledAt         DateTime?
+  lastLogin            DateTime?
+  lastActivity         DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  accounts             Account[]
+  alerts               Alert[]
+  apiKeys              ApiKey[]
+  authenticatorDevices AuthenticatorDevice[]
+  dashboards           Dashboard[]
+  gdprDataRequests     GDPRDataRequest[]
+  reports              Report[]
+  searches             SavedSearch[]
+  securityEvents       SecurityEvent[]
+  sessions             Session[]
+  teamMemberships      TeamMember[]
+  preferences          UserPreferences?
+  organization         Organization?         @relation(fields: [organizationId], references: [id])
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model UserPreferences {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  theme              String   @default("light")
+  defaultDashboard   String?
+  emailNotifications Boolean  @default(true)
+  pushNotifications  Boolean  @default(false)
+  weeklyDigest       Boolean  @default(true)
+  favoriteIndustries String?
+  favoriteCompanies  String?
+  alertThresholds    Json?
+  customSettings     Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model MarketData {
+  id            String   @id @default(cuid())
+  symbol        String
+  name          String
+  industry      String
+  sector        String
+  marketCap     Float?
+  price         Float
+  change        Float
+  changePercent Float
+  volume        Int?
+  timestamp     DateTime
+  source        String
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([symbol, timestamp])
+  @@index([industry])
+  @@index([sector])
+  @@map("market_data")
+}
+
+model CompanyProfile {
+  id           String       @id @default(cuid())
+  symbol       String       @unique
+  name         String
+  description  String?
+  industry     String
+  sector       String
+  website      String?
+  employees    Int?
+  founded      Int?
+  headquarters String?
+  ceo          String?
+  marketCap    Float?
+  revenue      Float?
+  netIncome    Float?
+  metadata     Json?
+  lastUpdated  DateTime
+  createdAt    DateTime     @default(now())
+  insights     AIInsight[]
+  competitors  Competitor[]
+  predictions  Prediction[]
+
+  @@index([industry])
+  @@index([sector])
+  @@map("company_profiles")
+}
+
+model Competitor {
+  id               String         @id @default(cuid())
+  companyId        String
+  competitorSymbol String
+  competitorName   String
+  similarity       Float
+  strengths        String?
+  weaknesses       String?
+  marketShare      Float?
+  metadata         Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  company          CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("competitors")
+}
+
+model AIInsight {
+  id          String          @id @default(cuid())
+  companyId   String?
+  type        String
+  title       String
+  description String
+  confidence  Float
+  impact      String
+  timeframe   String
+  actionable  Boolean         @default(true)
+  source      String
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  expiresAt   DateTime?
+  company     CompanyProfile? @relation(fields: [companyId], references: [id])
+
+  @@index([type])
+  @@index([createdAt])
+  @@map("ai_insights")
+}
+
+model Prediction {
+  id             String          @id @default(cuid())
+  companyId      String?
+  metric         String
+  predictedValue Float
+  confidence     Float
+  timeframe      String
+  methodology    String
+  factors        Json?
+  createdAt      DateTime        @default(now())
+  validUntil     DateTime
+  company        CompanyProfile? @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@map("predictions")
+}
+
+model AnalyticsMetric {
+  id        String   @id @default(cuid())
+  name      String
+  value     Float
+  unit      String?
+  category  String
+  timestamp DateTime
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([name, timestamp])
+  @@index([category])
+  @@map("analytics_metrics")
+}
+
+model UserActivity {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  resource   String?
+  resourceId String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  timestamp  DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([action])
+  @@map("user_activities")
+}
+
+model SavedSearch {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  query       String
+  filters     Json?
+  resultCount Int?
+  lastRun     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saved_searches")
+}
+
+model Report {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  type          String
+  format        String
+  content       Json
+  schedule      String?
+  lastGenerated DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("reports")
+}
+
+model Dashboard {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  layout    Json
+  widgets   Json
+  isDefault Boolean  @default(false)
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("dashboards")
+}
+
+model Alert {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  condition     Json
+  threshold     Float?
+  isActive      Boolean   @default(true)
+  lastTriggered DateTime?
+  triggerCount  Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("alerts")
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  key         String    @unique
+  permissions String?
+  lastUsed    DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([key])
+  @@map("api_keys")
+}
+
+model DataSource {
+  id            String    @id @default(cuid())
+  name          String
+  type          String
+  endpoint      String?
+  apiKey        String?
+  isActive      Boolean   @default(true)
+  lastSync      DateTime?
+  syncFrequency String?
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("data_sources")
+}
+
+model CacheEntry {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("cache_entries")
+}
+
+model Team {
+  id             String       @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  members        TeamMember[]
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  userId   String
+  teamId   String
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now())
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@map("team_members")
+}
+
+model Subscription {
+  id             String       @id @default(cuid())
+  organizationId String
+  plan           String
+  status         String       @default("ACTIVE")
+  startDate      DateTime     @default(now())
+  endDate        DateTime?
+  billingCycle   String       @default("MONTHLY")
+  maxUsers       Int
+  maxApiCalls    Int          @default(1000)
+  features       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model OrganizationUsage {
+  id             String       @id @default(cuid())
+  organizationId String
+  date           DateTime     @default(now())
+  apiCalls       Int          @default(0)
+  reports        Int          @default(0)
+  scorings       Int          @default(0)
+  activeUsers    Int          @default(0)
+  storage        Float        @default(0)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, date])
+  @@map("organization_usage")
+}
+
+model OrganizationInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  email          String
+  role           String       @default("USER")
+  token          String       @unique
+  invitedBy      String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_invitations")
+}
+
+model AuthenticatorDevice {
+  id                  String    @id @default(cuid())
+  userId              String
+  credentialID        String    @unique
+  credentialPublicKey String
+  counter             Int       @default(0)
+  transports          String
+  name                String?
+  createdAt           DateTime  @default(now())
+  lastUsedAt          DateTime?
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("authenticator_devices")
+}
+
+model MagicLink {
+  id            String    @id @default(cuid())
+  email         String
+  token         String    @unique
+  expiresAt     DateTime
+  isUsed        Boolean   @default(false)
+  usedAt        DateTime?
+  ipAddress     String?
+  userAgent     String?
+  usedIpAddress String?
+  createdAt     DateTime  @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("magic_links")
+}
+
+model SecurityEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String
+  severity    String
+  title       String
+  description String
+  riskScore   Int      @default(0)
+  indicators  String
+  ipAddress   String?
+  userAgent   String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([severity])
+  @@index([riskScore])
+  @@index([createdAt])
+  @@map("security_events")
+}
+
+model CustomDomain {
+  id                String       @id @default(cuid())
+  organizationId    String
+  domain            String       @unique
+  isVerified        Boolean      @default(false)
+  verificationToken String?
+  sslEnabled        Boolean      @default(false)
+  dnsRecord         String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([domain])
+  @@map("custom_domains")
+}
+
+model GDPRDataRequest {
+  id            String    @id @default(cuid())
+  userId        String
+  type          String
+  requestDate   DateTime  @default(now())
+  status        String    @default("pending")
+  completedDate DateTime?
+  dataExportUrl String?
+  deletionProof String?
+  processedBy   String?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([requestDate])
+  @@map("gdpr_data_requests")
+}
+
+model ComplianceReport {
+  id          String   @id @default(cuid())
+  type        String
+  format      String
+  period      Json
+  generatedAt DateTime @default(now())
+  generatedBy String
+  filePath    String?
+  fileSize    Int?
+  metadata    Json?
+
+  @@index([type])
+  @@index([generatedAt])
+  @@index([generatedBy])
+  @@map("compliance_reports")
+}
+
+model Organization {
+  id            String                   @id @default(cuid())
+  name          String                   @unique
+  slug          String                   @unique
+  domain        String?                  @unique
+  logo          String?
+  theme         String?
+  settings      String?
+  isActive      Boolean                  @default(true)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  customDomains CustomDomain[]
+  invitations   OrganizationInvitation[]
+  usageStats    OrganizationUsage[]
+  subscriptions Subscription[]
+  teams         Team[]
+  users         User[]
+
+  @@map("organizations")
+}

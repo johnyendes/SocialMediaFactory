@@ -1,0 +1,86 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    // Check if user is admin
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    console.log('✅ AUTH: GDPR export accessed by admin:', session.user.email);
+    
+    return NextResponse.json({
+      status: 'ready',
+      exports: [
+        {
+          id: '1',
+          userId: 'user123',
+          type: 'GDPR_COMPLETE',
+          status: 'completed',
+          completedDate: new Date().toISOString(),
+          downloadUrl: '/api/download/gdpr-export-1.zip',
+          fileSize: '2.4 MB'
+        },
+        {
+          id: '2',
+          userId: 'user456',
+          type: 'GDPR_COMPLETE',
+          status: 'processing',
+          initiatedDate: new Date().toISOString(),
+          estimatedCompletion: '2-3 minutes'
+        }
+      ],
+      authenticated: true,
+      user: session.user.email,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error in GDPR export:', error);
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        details: error.message
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    // Check if user is admin
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    console.log('✅ AUTH: GDPR export initiated by admin:', session.user.email, 'for user:', body.userId);
+    
+    return NextResponse.json({
+      status: 'initiated',
+      exportId: Date.now().toString(),
+      userId: body.userId,
+      estimatedCompletion: '2-3 minutes',
+      authenticated: true,
+      user: session.user.email,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error initiating GDPR export:', error);
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        details: error.message
+      },
+      { status: 500 }
+    );
+  }
+}
